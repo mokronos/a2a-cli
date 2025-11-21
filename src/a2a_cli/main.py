@@ -20,13 +20,14 @@ from a2a_cli.utils import get_text
 pf = PrettyFormat()
 
 @click.command()
-@click.option("--agent-url", default="http://localhost:8000")
+@click.option("--agent-url", default="http://localhost:10001")
 @click.option(
     "--task",
     default="what tools do you have available? Use one, just for testing, with random parameters, and report on your findings.",
 )
 async def main(agent_url: str, task: str):
     click.echo(f"Connecting to agent at {agent_url}")
+    click.echo(f"Task: {task}")
 
     async with httpx.AsyncClient(timeout=30) as httpx_client:
         card_resolver = A2ACardResolver(httpx_client=httpx_client, base_url=agent_url)
@@ -49,18 +50,12 @@ async def main(agent_url: str, task: str):
             message_id=str(uuid4()),
         )
 
-        payload = MessageSendParams(
-            message=message,
-            configuration=MessageSendConfiguration(
-                accepted_output_modes=["text"],
-            ),
-        )
-
         resp = client.send_message(
             request=message,
         )
 
         async for event in resp:
+
             if isinstance(event, Message):
                 for part in event.parts:
                     if isinstance(part.root, TextPart):
@@ -74,3 +69,8 @@ async def main(agent_url: str, task: str):
                 elif isinstance(update, TaskStatusUpdateEvent):
                     click.echo(f"Status: \n{update.status.state} | {get_text(update.status.message)}", err=True)
         click.echo("")  # Ensure newline at the end
+
+
+
+if __name__ == "__main__":
+    main()

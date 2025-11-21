@@ -1,4 +1,3 @@
-from time import sleep
 from uuid import uuid4
 
 import asyncclick as click
@@ -6,21 +5,19 @@ import httpx
 from a2a.client import A2ACardResolver, ClientConfig, ClientFactory
 from a2a.types import (
     AgentCard,
-    GetTaskRequest,
     Message,
     MessageSendConfiguration,
     MessageSendParams,
     Part,
     Role,
-    SendMessageRequest,
-    SendStreamingMessageRequest,
-    TaskQueryParams,
     TextPart,
+    TaskArtifactUpdateEvent,
+    TaskStatusUpdateEvent,
 )
 from devtools import PrettyFormat
+from a2a_cli.utils import get_text
 
 pf = PrettyFormat()
-
 
 @click.command()
 @click.option("--agent-url", default="http://localhost:8000")
@@ -63,14 +60,17 @@ async def main(agent_url: str, task: str):
             request=message,
         )
 
-        print(resp)
-
-        # responses = [x async for x in resp]
-
-        # print(len(responses))
-
-
-
         async for event in resp:
-            click.echo(pf(event[1]))
-        exit()
+            if isinstance(event, Message):
+                for part in event.parts:
+                    if isinstance(part.root, TextPart):
+                        click.echo(part.root.text)
+            elif isinstance(event, tuple):
+                _, update = event
+                if isinstance(update, TaskArtifactUpdateEvent):
+                    for part in update.artifact.parts:
+                        if isinstance(part.root, TextPart):
+                            click.echo(part.root.text, nl=False)
+                elif isinstance(update, TaskStatusUpdateEvent):
+                    click.echo(f"Status: \n{update.status.state} | {get_text(update.status.message)}", err=True)
+        click.echo("")  # Ensure newline at the end

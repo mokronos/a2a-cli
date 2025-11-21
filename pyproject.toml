@@ -49,6 +49,10 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/a2a_cli"]
 
+[tool.pyright]
+venv = ".venv"
+venvPath = "."
+
 [tool.mypy]
 files = ["src"]
 disallow_untyped_defs = true
@@ -112,5 +116,3 @@ ignore = [
 
 [tool.ruff.format]
 preview = true
-
-

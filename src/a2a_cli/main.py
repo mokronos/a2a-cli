@@ -6,8 +6,6 @@ from a2a.client import A2ACardResolver, ClientConfig, ClientFactory
 from a2a.types import (
     AgentCard,
     Message,
-    MessageSendConfiguration,
-    MessageSendParams,
     Part,
     Role,
     TextPart,
@@ -18,6 +16,42 @@ from devtools import PrettyFormat
 from a2a_cli.utils import get_text
 
 pf = PrettyFormat()
+
+
+async def stream_task(client, context_id: str, task_text: str) -> None:
+    message = Message(
+        role=Role.user,
+        parts=[Part(root=TextPart(text=task_text))],
+        message_id=str(uuid4()),
+        context_id=context_id,
+    )
+
+    resp = client.send_message(
+        request=message,
+    )
+
+    task_id = None
+    async for event in resp:
+        if isinstance(event, Message):
+            for part in event.parts:
+                if isinstance(part.root, TextPart):
+                    click.echo(part.root.text)
+        elif isinstance(event, tuple):
+            task, update = event
+            if task_id is None:
+                task_id = task.id
+                click.echo(f"Task ID: {task_id}", err=True)
+            if isinstance(update, TaskArtifactUpdateEvent):
+                for part in update.artifact.parts:
+                    if isinstance(part.root, TextPart):
+                        click.echo(part.root.text, nl=False)
+            elif isinstance(update, TaskStatusUpdateEvent):
+                click.echo(
+                    f"Status: \n{update.status.state} | {get_text(update.status.message)}",
+                    err=True,
+                )
+    click.echo("")  # Ensure newline at the end
+
 
 @click.command()
 @click.option("--agent-url", default="http://localhost:10001")
@@ -44,31 +78,19 @@ async def main(agent_url: str, task: str):
         client = client_factory.create(card=agent_card)
         context_id = str(uuid4())
 
-        message = Message(
-            role=Role.user,
-            parts=[Part(root=TextPart(text=task))],
-            message_id=str(uuid4()),
-        )
+        await stream_task(client, context_id, task)
 
-        resp = client.send_message(
-            request=message,
-        )
-
-        async for event in resp:
-
-            if isinstance(event, Message):
-                for part in event.parts:
-                    if isinstance(part.root, TextPart):
-                        click.echo(part.root.text)
-            elif isinstance(event, tuple):
-                _, update = event
-                if isinstance(update, TaskArtifactUpdateEvent):
-                    for part in update.artifact.parts:
-                        if isinstance(part.root, TextPart):
-                            click.echo(part.root.text, nl=False)
-                elif isinstance(update, TaskStatusUpdateEvent):
-                    click.echo(f"Status: \n{update.status.state} | {get_text(update.status.message)}", err=True)
-        click.echo("")  # Ensure newline at the end
+        while True:
+            followup = (
+                await click.prompt(
+                    "Ask a follow-up (leave blank to exit)",
+                    default="",
+                    show_default=False,
+                )
+            ).strip()
+            if not followup:
+                break
+            await stream_task(client, context_id, followup)
 
 
 

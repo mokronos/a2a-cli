@@ -9,6 +9,7 @@ from a2a.types import (
     Message,
     Part,
     Role,
+    TaskQueryParams,
     TextPart,
     TaskArtifactUpdateEvent,
     TaskStatusUpdateEvent,
@@ -75,6 +76,28 @@ async def stream_task(client: Any, context_id: str, task_text: str) -> None:
         click.echo()
     click.echo("")  # Ensure newline at the end
 
+async def get_task(task_id: str) -> None:
+    async with httpx.AsyncClient(timeout=30) as httpx_client:
+        card_resolver = A2ACardResolver(httpx_client=httpx_client, base_url=agent_url)
+        agent_card: AgentCard = await card_resolver.get_agent_card()
+
+        click.echo(click.style("Agent card:", fg="yellow", bold=True))
+        click.echo(click.style(pf(agent_card), fg="bright_black"))
+
+        client_config = ClientConfig(
+            streaming=agent_card.capabilities.streaming,
+            polling=not agent_card.capabilities.streaming,
+            httpx_client=httpx_client,
+        )
+        client_factory = ClientFactory(client_config)
+        client = client_factory.create(card=agent_card)
+
+        task_query = TaskQueryParams(id=task_id)
+
+        resp = client.get_task(task_query)
+
+        print(resp)
+
 
 @click.command()
 @click.option("--agent-url", default="http://localhost:10001")
@@ -120,3 +143,6 @@ async def main(agent_url: str, task: str) -> None:
 
 if __name__ == "__main__":
     main()
+    # import asyncio
+    # TASK_ID = ""
+    # asyncio.run(get_task(TASK_ID))

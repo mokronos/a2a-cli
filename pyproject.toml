@@ -18,6 +18,7 @@ dependencies = [
     "asyncclick>=8.3.0.7",
     "devtools>=0.12.2",
     "httpx>=0.28.1",
+    "prompt-toolkit>=3.0.52",
 ]
 
 [project.scripts]

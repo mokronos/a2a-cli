@@ -1,5 +1,7 @@
 """A2A CLI - Interactive client for A2A agents."""
 
+import time
+
 import asyncclick as click
 from devtools import PrettyFormat
 from prompt_toolkit import PromptSession
@@ -24,6 +26,10 @@ PROMPT_STYLE = Style.from_dict({
     "prompt": "#ffffff",
     "command": "#00aaff bold",
 })
+
+# Time window for double Ctrl+C to quit (in seconds)
+# This is short enough that typing anything will exceed it
+DOUBLE_CTRL_C_THRESHOLD = 0.5
 
 
 @click.command()
@@ -76,6 +82,8 @@ async def main(agent_url: str | None, task: str | None) -> None:
             click.echo(click.style("Failed to connect. Use /connect <url> to try again.", fg="red"))
 
     # Main interactive loop
+    last_interrupt_time: float = 0.0
+    
     try:
         while True:
             try:
@@ -113,9 +121,17 @@ async def main(agent_url: str | None, task: str | None) -> None:
                 await stream_task(session.client, session.context_id, user_input)
 
             except KeyboardInterrupt:
-                # Handle Ctrl+C - exit the program
-                click.echo()
-                break
+                # Handle Ctrl+C - double quick press to quit
+                current_time = time.time()
+                click.echo()  # Move to new line
+                
+                if current_time - last_interrupt_time < DOUBLE_CTRL_C_THRESHOLD:
+                    # Second Ctrl+C within threshold - exit
+                    break
+                else:
+                    # First Ctrl+C - show hint
+                    last_interrupt_time = current_time
+                    click.echo(click.style("Press Ctrl+C again quickly to exit.", fg="bright_black"))
 
     except EOFError:
         # Handle Ctrl+D

@@ -44,13 +44,13 @@ async def stream_task(client: Any, context_id: str, task_text: str) -> None:
                         click.echo(click.style(part.root.text, fg="bright_white"))
             elif isinstance(event, tuple):
                 task, update = event
-                print(update)
                 if task_id is None:
                     task_id = task.id
                     click.echo(click.style(f"Task ID: {task_id}", fg="cyan", bold=True), err=True)
                 if isinstance(update, TaskArtifactUpdateEvent):
-                    # no need to display the final output fully again
-                    if update.artifact.name == "final_output_total":
+                    # Skip artifacts that contain the complete text (already displayed via streaming)
+                    skip_artifacts = {"final_output_total", "output_end", "full_output"}
+                    if update.artifact.name in skip_artifacts:
                         continue
 
                     # Determine color based on artifact name

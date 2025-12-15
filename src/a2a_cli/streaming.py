@@ -17,6 +17,16 @@ from a2a.types import (
 
 from a2a_cli.utils import get_text
 
+MAX_TOOL_RESULT_CHARS = 2000
+MAX_TOOL_RESULT_LINES = 5
+
+
+def truncate_tool_result(text: str) -> str:
+    truncated_text = text[:MAX_TOOL_RESULT_CHARS]
+    if len(truncated_text.splitlines()) > MAX_TOOL_RESULT_LINES:
+        truncated_text = "\n".join(truncated_text.splitlines()[:MAX_TOOL_RESULT_LINES])
+    return truncated_text
+
 
 async def stream_task(client: Any, context_id: str, task_text: str) -> None:
     """Stream a task to the A2A agent and display the response."""
@@ -57,15 +67,19 @@ async def stream_task(client: Any, context_id: str, task_text: str) -> None:
                     artifact_name = update.artifact.name
                     if artifact_name == "tool_result":
                         color = "cyan"
-                        force_newline = True  # Always add newline after tool results
+                        force_newline = True
+                        should_truncate = True
                     else:
                         color = "green"
                         force_newline = False
+                        should_truncate = False
 
                     trailing_newline = False
                     for part in update.artifact.parts:
                         if isinstance(part.root, TextPart):
                             text = part.root.text
+                            if should_truncate:
+                                text = truncate_tool_result(text)
                             trailing_newline = text.endswith("\n")
                             click.echo(click.style(text, fg=color), nl=False)
 

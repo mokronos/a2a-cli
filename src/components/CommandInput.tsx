@@ -1,6 +1,6 @@
 import React from 'react';
-import { Box, Text, Newline } from 'ink/build/index.js';
-import TextInput from 'ink-text-input/build/index.js';
+import { Box, Text, Newline } from 'ink';
+import TextInput from 'ink-text-input';
 
 interface CommandInputProps {
   onCommand: (command: string) => void;

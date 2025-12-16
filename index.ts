@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-// A2A CLI implementation with actual agent communication
+// A2A CLI implementation with agent communication
 import got from 'got';
 
 interface AppState {
@@ -193,6 +193,7 @@ async function handleCommand(command: string): Promise<boolean> {
         state.connected = false;
         state.agentName = undefined;
         state.agentUrl = undefined;
+        state.agentCard = undefined;
       } else {
         console.log('\x1b[33mNot connected to any agent.\x1b[0m');
       }
@@ -214,7 +215,7 @@ async function handleCommand(command: string): Promise<boolean> {
     case '/card':
       if (state.connected) {
         console.log('\x1b[33mAgent card:\x1b[0m');
-        console.log('\x1b[90m{\n  "name": "Test Agent",\n  "description": "A test A2A agent"\n}\x1b[0m');
+        console.log('\x1b[90m' + JSON.stringify(state.agentCard, null, 2) + '\x1b[0m');
       } else {
         console.log('\x1b[33mNot connected to any agent.\x1b[0m');
       }
@@ -236,18 +237,18 @@ async function handleCommand(command: string): Promise<boolean> {
       console.log('\x1b[36mGoodbye!\x1b[0m');
       return false;
 
-      default:
-        if (command.startsWith('/')) {
-          console.log(`\x1b[31mUnknown command: ${cmd}\x1b[0m`);
-          console.log('\x1b[90mType /help for available commands.\x1b[0m');
+    default:
+      if (command.startsWith('/')) {
+        console.log(`\x1b[31mUnknown command: ${cmd}\x1b[0m`);
+        console.log('\x1b[90mType /help for available commands.\x1b[0m');
+      } else {
+        if (!state.connected) {
+          console.log('\x1b[31mNot connected to any agent.\x1b[0m');
+          console.log('\x1b[90mUse /connect <url> to connect first.\x1b[0m');
         } else {
-          if (!state.connected) {
-            console.log('\x1b[31mNot connected to any agent.\x1b[0m');
-            console.log('\x1b[90mUse /connect <url> to connect first.\x1b[0m');
-          } else {
-            await sendTaskToAgent(command);
-          }
+          await sendTaskToAgent(command);
         }
+      }
   }
 
   return true;
@@ -281,7 +282,7 @@ async function main() {
     }
   }
 
-  // REPL loop with tab completion
+  // REPL loop with improved tab completion
   const readline = await import('readline');
   
   const rl = readline.createInterface({
@@ -289,17 +290,19 @@ async function main() {
     output: process.stdout,
     prompt: getPrompt(),
     completer: (line: string) => {
-      // Handle command completion
-      if (!line.includes(' ')) {
-        const hits = SLASH_COMMANDS.filter(cmd => cmd.startsWith(line));
-        return [hits.length ? hits : SLASH_COMMANDS, line];
+      const trimmed = line.trim();
+      
+      // URL completion for /connect
+      if (trimmed.startsWith('/connect ')) {
+        const urlPart = trimmed.substring(9);
+        const matches = URL_SUGGESTIONS.filter(url => url.startsWith(urlPart));
+        return [matches.length > 0 ? matches : URL_SUGGESTIONS, line];
       }
       
-      // Handle URL completion for /connect
-      if (line.startsWith('/connect ')) {
-        const urlPart = line.substring(9);
-        const hits = URL_SUGGESTIONS.filter(url => url.startsWith(urlPart));
-        return [hits, line];
+      // Command completion
+      if (!trimmed.includes(' ') && (trimmed === '' || trimmed.startsWith('/'))) {
+        const matches = SLASH_COMMANDS.filter(command => command.startsWith(trimmed));
+        return [matches.length > 0 ? matches : SLASH_COMMANDS, line];
       }
       
       return [[], line];
